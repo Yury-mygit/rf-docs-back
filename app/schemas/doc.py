@@ -4,7 +4,7 @@ from uuid import UUID
 from app.schemas.common import CamelModel
 
 
-DocKind = Literal["page", "change_map", "project_root", "website_base"]
+DocKind = Literal["page", "change_map", "project_root", "website_base", "api_contract"]
 
 
 class DocCreate(CamelModel):
@@ -78,3 +78,8 @@ class DocRevisionFull(CamelModel):
     body_md: str
     author: str | None
     created_at: int
+
+
+class ShareCreateResponse(CamelModel):
+    token: UUID
+    expires_at: int

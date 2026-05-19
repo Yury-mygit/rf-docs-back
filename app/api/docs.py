@@ -11,7 +11,7 @@ from app.core.database import get_db
 from app.core.deps import verify_token
 from app.core.exceptions import APIError
 from app.core.utils import now_ms
-from app.models.models import Doc, DocRevision, Workspace
+from app.models.models import Doc, DocRevision, ShareToken, Workspace
 from app.schemas.doc import (
     DocCreate,
     DocKind,
@@ -21,16 +21,17 @@ from app.schemas.doc import (
     DocRevisionMeta,
     DocSearchHit,
     DocTreeItem,
+    ShareCreateResponse,
 )
 
 router = APIRouter(prefix="/docs", tags=["docs"])
 
 
-KIND_VALUES: set[str] = {"page", "change_map", "project_root", "website_base"}
+KIND_VALUES: set[str] = {"page", "change_map", "project_root", "website_base", "api_contract"}
 # Эти типы НЕ могут иметь подстраниц.
-KIND_NO_CHILDREN: set[str] = {"change_map", "website_base"}
-# Slug разрешён только у этих типов (на v0 — только project_root).
-KIND_ALLOWS_SLUG: set[str] = {"project_root"}
+KIND_NO_CHILDREN: set[str] = {"change_map", "website_base", "api_contract"}
+# Slug разрешён у этих типов (общий namespace, конфликты → 409).
+KIND_ALLOWS_SLUG: set[str] = {"project_root", "api_contract"}
 SLUG_RE = re.compile(r"^[a-z0-9-]{1,64}$")
 
 
@@ -318,6 +319,36 @@ async def delete_doc(
     doc.deleted_at = ts
     doc.updated_at = ts
     await db.commit()
+
+
+SHARE_TTL_MS = 24 * 3600 * 1000
+
+
+@router.post(
+    "/{doc_id}/share",
+    response_model=ShareCreateResponse,
+    status_code=status.HTTP_201_CREATED,
+)
+async def create_share(
+    doc_id: UUID,
+    db: AsyncSession = Depends(get_db),
+    _: None = Depends(verify_token),
+    x_user_email: str | None = Header(default=None, alias="X-User-Email"),
+) -> ShareCreateResponse:
+    doc = await db.get(Doc, doc_id)
+    if not doc or doc.deleted_at is not None:
+        raise APIError(404, "doc_not_found", f"Doc with id '{doc_id}' does not exist")
+    now = now_ms()
+    share = ShareToken(
+        token=uuid.uuid4(),
+        doc_id=doc_id,
+        expires_at=now + SHARE_TTL_MS,
+        created_at=now,
+        created_by_email=x_user_email,
+    )
+    db.add(share)
+    await db.commit()
+    return ShareCreateResponse(token=share.token, expires_at=share.expires_at)
 
 
 @router.post("/{doc_id}/restore", response_model=DocResponse)

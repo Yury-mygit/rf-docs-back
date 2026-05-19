@@ -1,9 +1,9 @@
 """FastMCP server exposing docs tools over /mcp.
 
 Тонкий wrapper над `/api/v1/docs/*` через httpx-loopback на 127.0.0.1:8000
-со static API_KEY. Авторство ревизий — `claude@local` (за `auth_required ln-dev`
-в Caddy ходит только этот юзер; правки от Юрия идут через browser-UI и
-проставляются автоматически).
+со static API_KEY. Авторство ревизий — `claude@local` (за `auth_required docs-dev`
+в Caddy ходит только этот юзер с api_token grant'ом docs-dev; правки от Юрия
+идут через browser-UI и проставляются автоматически).
 """
 import uuid
 from typing import Any
@@ -110,9 +110,10 @@ async def docs_create(
 
     kind: 'page' (default, may have children) | 'change_map' (no children) |
     'project_root' (may have children, exactly one website_base allowed) |
-    'website_base' (no children, must be a child of a project_root, max 1 per parent).
+    'website_base' (no children, must be a child of a project_root, max 1 per parent) |
+    'api_contract' (no children, public via /api/v1/site/contracts/{slug}).
 
-    slug: optional URL-slug; allowed only for kind='project_root'.
+    slug: optional URL-slug; allowed for kind ∈ {'project_root', 'api_contract'}.
     Must match [a-z0-9-]{1,64} and be globally unique among active docs.
     """
     ts = now_ms()
@@ -144,8 +145,8 @@ async def docs_update(
 ) -> dict:
     """Update fields of a doc. Pass only what you want to change.
 
-    kind values: 'page' | 'change_map' | 'project_root' | 'website_base'.
-    slug: only for project_root; pass empty string '' to clear (treated as null).
+    kind values: 'page' | 'change_map' | 'project_root' | 'website_base' | 'api_contract'.
+    slug: allowed for kind ∈ {'project_root', 'api_contract'}; pass empty string '' to clear.
     Constraints validated server-side; ошибка 400/409 при нарушениях
     (см. docs_create описание).
     """

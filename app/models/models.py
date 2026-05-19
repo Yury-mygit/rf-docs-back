@@ -59,3 +59,18 @@ class DocRevision(Base):
     body_md: Mapped[str] = mapped_column(Text, nullable=False, default="")
     author: Mapped[str | None] = mapped_column(String(128), nullable=True)
     created_at: Mapped[int] = mapped_column(BigInteger, nullable=False)
+
+
+class ShareToken(Base):
+    __tablename__ = "share_tokens"
+
+    token: Mapped[uuid.UUID] = mapped_column(UuidType(), primary_key=True)
+    doc_id: Mapped[uuid.UUID] = mapped_column(
+        UuidType(),
+        ForeignKey("docs.id", ondelete="CASCADE"),
+        nullable=False,
+        index=True,
+    )
+    expires_at: Mapped[int] = mapped_column(BigInteger, nullable=False)
+    created_at: Mapped[int] = mapped_column(BigInteger, nullable=False)
+    created_by_email: Mapped[str | None] = mapped_column(String(255), nullable=True)
